@@ -177,11 +177,21 @@ s! {
     }
 
     pub struct sigaction {
-        pub sa_handler: usize,
+        pub sa_sigaction: crate::sighandler_t,
         pub sa_mask: sigset_t,
         pub sa_flags: i32,
         pub sa_user: usize,
         __reserved: [usize; __DEFAULT_RESERVED_SIZE__],
+    }
+
+    pub struct siginfo_t {
+        pub si_signo: u8,
+        pub si_code: u8,
+        pub si_errno: u8,
+        pub si_value: crate::sigval,
+        pub si_pid: crate::pid_t,
+        pub si_status: c_int,
+        pub si_user: *mut c_void,
     }
 
     pub struct termios {
@@ -228,9 +238,25 @@ s! {
         pub imr_interface: in_addr,
     }
 
+    pub struct ip_mreq_source {
+        pub imr_multiaddr: in_addr,
+        pub imr_interface: in_addr,
+        pub imr_sourceaddr: in_addr,
+    }
+
     pub struct ipv6_mreq {
         pub ipv6mr_multiaddr: in6_addr,
         pub ipv6mr_interface: u32,
+    }
+
+    pub struct msghdr {
+        pub msg_name: *mut c_void,
+        pub msg_namelen: socklen_t,
+        pub msg_iov: *mut crate::iovec,
+        pub msg_iovlen: size_t,
+        pub msg_control: *mut c_void,
+        pub msg_controllen: size_t,
+        pub msg_flags: c_int,
     }
 
     pub struct timeval {
@@ -493,28 +519,60 @@ pub const POLLRDHUP: c_short = 0x10;
 pub const POLLNVAL: c_short = 0x20;
 
 // sys/socket.h
-pub const AF_UNIX: i32 = 1;
-pub const SOCK_DGRAM: i32 = 2;
-pub const SOCK_STREAM: i32 = 1;
-pub const SOCK_CLOEXEC: i32 = 0o2000000;
-pub const SOCK_NONBLOCK: i32 = 0o00004000;
-pub const AF_INET: i32 = 2;
-pub const AF_INET6: i32 = 10;
-pub const MSG_PEEK: i32 = 0x02;
-pub const SOL_SOCKET: i32 = 1;
-pub const SHUT_WR: i32 = 2;
-pub const SHUT_RD: i32 = 1;
-pub const SHUT_RDWR: i32 = 3;
-pub const SO_ERROR: i32 = 4;
-pub const SO_REUSEADDR: i32 = 11;
-pub const SOMAXCONN: i32 = 8;
-pub const SO_LINGER: i32 = 6;
-pub const SO_RCVTIMEO: i32 = 0xa;
-pub const SO_SNDTIMEO: i32 = 0xe;
-pub const SO_BROADCAST: i32 = 1;
+pub const AF_UNSPEC: c_int = 0;
+pub const AF_UNIX: c_int = 1;
+pub const SOCK_DGRAM: c_int = 2;
+pub const SOCK_RAW: c_int = 3;
+pub const SOCK_RDM: c_int = 4;
+pub const SOCK_SEQPACKET: c_int = 5;
+pub const SOCK_STREAM: c_int = 1;
+pub const SOCK_CLOEXEC: c_int = 0o2000000;
+pub const SOCK_NONBLOCK: c_int = 0o00004000;
+pub const AF_INET: c_int = 2;
+pub const AF_INET6: c_int = 10;
+pub const MSG_OOB: c_int = 0x01;
+pub const MSG_PEEK: c_int = 0x02;
+pub const MSG_DONTROUTE: c_int = 0x04;
+pub const MSG_CTRUNC: c_int = 0x08;
+pub const MSG_PROXY: c_int = 0x10;
+pub const MSG_TRUNC: c_int = 0x20;
+pub const MSG_DONTWAIT: c_int = 0x40;
+pub const MSG_EOR: c_int = 0x80;
+pub const MSG_WAITALL: c_int = 0x100;
+pub const MSG_FIN: c_int = 0x200;
+pub const MSG_SYN: c_int = 0x400;
+pub const MSG_CONFIRM: c_int = 0x800;
+pub const MSG_RST: c_int = 0x1000;
+pub const MSG_ERRQUEUE: c_int = 0x2000;
+pub const MSG_NOSIGNAL: c_int = 0x4000;
+pub const MSG_MORE: c_int = 0x8000;
+pub const MSG_CMSG_CLOEXEC: c_int = 0x100000;
+pub const SOL_SOCKET: c_int = 1;
+pub const SHUT_WR: c_int = 2;
+pub const SHUT_RD: c_int = 1;
+pub const SHUT_RDWR: c_int = 3;
+pub const SOMAXCONN: c_int = 8;
 
-// netinet/tcp.h
-pub const TCP_NODELAY: i32 = 0x10;
+// Socket options from sys/socket.h
+pub const SO_ACCEPTCONN: c_int = 0;
+pub const SO_BROADCAST: c_int = 1;
+pub const SO_DEBUG: c_int = 2;
+pub const SO_DONTROUTE: c_int = 3;
+pub const SO_ERROR: c_int = 4;
+pub const SO_KEEPALIVE: c_int = 5;
+pub const SO_LINGER: c_int = 6;
+pub const SO_OOBINLINE: c_int = 7;
+pub const SO_RCVBUF: c_int = 8;
+pub const SO_RCVLOWAT: c_int = 9;
+pub const SO_RCVTIMEO: c_int = 10;
+pub const SO_REUSEADDR: c_int = 11;
+pub const SO_SNDBUF: c_int = 12;
+pub const SO_SNDLOWAT: c_int = 13;
+pub const SO_SNDTIMEO: c_int = 14;
+pub const SO_TYPE: c_int = 15;
+pub const SO_TIMESTAMP: c_int = 16;
+pub const SO_BINDTODEVICE: c_int = 17;
+pub const SO_PEERCRED: c_int = 18;
 
 // nuttx/fs/ioctl.h
 pub const FIONBIO: i32 = 0x30a;
@@ -562,19 +620,59 @@ pub const SIGPOLL: c_int = SIGIO;
 pub const SIGPWR: c_int = 30;
 pub const SIGSYS: c_int = 31;
 
+// Signal mask constants from signal.h
+pub const SIG_BLOCK: c_int = 1;
+pub const SIG_UNBLOCK: c_int = 2;
+pub const SIG_SETMASK: c_int = 3;
+
+// struct sigaction flag values from signal.h
+pub const SA_NOCLDSTOP: c_int = 1 << 0;
+pub const SA_SIGINFO: c_int = 1 << 1;
+pub const SA_NOCLDWAIT: c_int = 1 << 2;
+pub const SA_ONSTACK: c_int = 1 << 3;
+pub const SA_RESTART: c_int = 1 << 4;
+pub const SA_NODEFER: c_int = 1 << 5;
+pub const SA_RESETHAND: c_int = 1 << 6;
+pub const SA_KERNELHAND: c_int = 1 << 7;
+
 // pthread.h
 pub const PTHREAD_MUTEX_NORMAL: i32 = 0;
 
 // netinet/in.h
-pub const IP_TTL: i32 = 0x1e;
-pub const IPV6_V6ONLY: i32 = 0x17;
-pub const IPV6_JOIN_GROUP: i32 = 0x11;
-pub const IPV6_LEAVE_GROUP: i32 = 0x12;
-pub const IP_MULTICAST_LOOP: i32 = 0x13;
-pub const IPV6_MULTICAST_LOOP: i32 = 0x15;
-pub const IP_MULTICAST_TTL: i32 = 0x12;
-pub const IP_ADD_MEMBERSHIP: i32 = 0x14;
-pub const IP_DROP_MEMBERSHIP: i32 = 0x15;
+const __SO_PROTOCOL: c_int = 16;
+pub const IP_MULTICAST_IF: c_int = __SO_PROTOCOL + 1;
+pub const IP_MULTICAST_TTL: c_int = __SO_PROTOCOL + 2;
+pub const IP_MULTICAST_LOOP: c_int = __SO_PROTOCOL + 3;
+pub const IP_ADD_MEMBERSHIP: c_int = __SO_PROTOCOL + 4;
+pub const IP_DROP_MEMBERSHIP: c_int = __SO_PROTOCOL + 5;
+pub const IP_UNBLOCK_SOURCE: c_int = __SO_PROTOCOL + 6;
+pub const IP_BLOCK_SOURCE: c_int = __SO_PROTOCOL + 7;
+pub const IP_ADD_SOURCE_MEMBERSHIP: c_int = __SO_PROTOCOL + 8;
+pub const IP_DROP_SOURCE_MEMBERSHIP: c_int = __SO_PROTOCOL + 9;
+pub const IP_MSFILTER: c_int = __SO_PROTOCOL + 10;
+pub const IP_MULTICAST_ALL: c_int = __SO_PROTOCOL + 11;
+pub const IP_PKTINFO: c_int = __SO_PROTOCOL + 12;
+pub const IP_TOS: c_int = __SO_PROTOCOL + 13;
+pub const IP_TTL: c_int = __SO_PROTOCOL + 14;
+pub const IPV6_JOIN_GROUP: c_int = __SO_PROTOCOL + 1;
+pub const IPV6_LEAVE_GROUP: c_int = __SO_PROTOCOL + 2;
+pub const IPV6_MULTICAST_HOPS: c_int = __SO_PROTOCOL + 3;
+pub const IPV6_MULTICAST_IF: c_int = __SO_PROTOCOL + 4;
+pub const IPV6_MULTICAST_LOOP: c_int = __SO_PROTOCOL + 5;
+pub const IPV6_UNICAST_HOPS: c_int = __SO_PROTOCOL + 6;
+pub const IPV6_V6ONLY: c_int = __SO_PROTOCOL + 7;
+pub const IPV6_PKTINFO: c_int = __SO_PROTOCOL + 8;
+pub const IPV6_RECVPKTINFO: c_int = __SO_PROTOCOL + 9;
+pub const IPV6_TCLASS: c_int = __SO_PROTOCOL + 10;
+pub const IPV6_RECVHOPLIMIT: c_int = __SO_PROTOCOL + 11;
+pub const IPV6_HOPLIMIT: c_int = __SO_PROTOCOL + 12;
+
+// netinet/tcp.h
+pub const TCP_NODELAY: c_int = __SO_PROTOCOL + 0;
+pub const TCP_KEEPIDLE: c_int = __SO_PROTOCOL + 1;
+pub const TCP_KEEPINTVL: c_int = __SO_PROTOCOL + 2;
+pub const TCP_KEEPCNT: c_int = __SO_PROTOCOL + 3;
+pub const TCP_MAXSEG: c_int = __SO_PROTOCOL + 4;
 
 // sys/eventfd.h
 pub const EFD_NONBLOCK: i32 = O_NONBLOCK;
@@ -593,6 +691,8 @@ extern "C" {
         src_addr: *mut sockaddr,
         addrlen: *mut socklen_t,
     ) -> i32;
+    pub fn recvmsg(sockfd: i32, msg: *mut msghdr, flags: i32) -> isize;
+    pub fn sendmsg(sockfd: i32, msg: *const msghdr, flags: i32) -> isize;
 
     pub fn pthread_create(
         thread: *mut pthread_t,
