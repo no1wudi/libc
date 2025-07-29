@@ -26,6 +26,7 @@ pub type tcflag_t = u32;
 pub type clockid_t = i32;
 pub type time_t = i64;
 pub type wchar_t = i32;
+pub type eventfd_t = u64;
 
 s! {
     pub struct stat {
@@ -428,6 +429,7 @@ pub const ECASECLASH: i32 = 140;
 
 // fcntl.h
 pub const FIOCLEX: i32 = 0x30b;
+pub const F_SETFD: i32 = 0x8;
 pub const F_SETFL: i32 = 0x9;
 pub const F_DUPFD_CLOEXEC: i32 = 0x12;
 pub const F_GETFD: i32 = 0x1;
@@ -441,6 +443,7 @@ pub const O_NOCTTY: i32 = 0x0;
 pub const O_TRUNC: i32 = 0x20;
 pub const O_APPEND: i32 = 0x10;
 pub const O_NONBLOCK: i32 = 0x40;
+pub const O_SYNC: i32 = 0x80;
 pub const O_DSYNC: i32 = 0x80;
 pub const O_DIRECT: i32 = 0x200;
 pub const O_LARGEFILE: i32 = 0x2000;
@@ -477,16 +480,24 @@ pub const S_IWOTH: u32 = 0x002;
 pub const S_IXOTH: u32 = 0x001;
 
 // sys/poll.h
-pub const POLLIN: i16 = 0x01;
-pub const POLLOUT: i16 = 0x04;
-pub const POLLHUP: i16 = 0x10;
-pub const POLLERR: i16 = 0x08;
-pub const POLLNVAL: i16 = 0x20;
+pub const POLLIN: c_short = 0x01;
+pub const POLLRDNORM: c_short = 0x01;
+pub const POLLRDBAND: c_short = 0x01;
+pub const POLLPRI: c_short = 0x02;
+pub const POLLOUT: c_short = 0x04;
+pub const POLLWRNORM: c_short = 0x04;
+pub const POLLWRBAND: c_short = 0x04;
+pub const POLLERR: c_short = 0x08;
+pub const POLLHUP: c_short = 0x10;
+pub const POLLRDHUP: c_short = 0x10;
+pub const POLLNVAL: c_short = 0x20;
 
 // sys/socket.h
 pub const AF_UNIX: i32 = 1;
 pub const SOCK_DGRAM: i32 = 2;
 pub const SOCK_STREAM: i32 = 1;
+pub const SOCK_CLOEXEC: i32 = 0o2000000;
+pub const SOCK_NONBLOCK: i32 = 0o00004000;
 pub const AF_INET: i32 = 2;
 pub const AF_INET6: i32 = 10;
 pub const MSG_PEEK: i32 = 0x02;
@@ -565,6 +576,11 @@ pub const IP_MULTICAST_TTL: i32 = 0x12;
 pub const IP_ADD_MEMBERSHIP: i32 = 0x14;
 pub const IP_DROP_MEMBERSHIP: i32 = 0x15;
 
+// sys/eventfd.h
+pub const EFD_NONBLOCK: i32 = O_NONBLOCK;
+pub const EFD_SEMAPHORE: i32 = O_SYNC;
+pub const EFD_CLOEXEC: i32 = O_CLOEXEC;
+
 extern "C" {
     pub fn bind(sockfd: i32, addr: *const sockaddr, addrlen: socklen_t) -> i32;
     pub fn ioctl(fd: i32, request: i32, ...) -> i32;
@@ -593,4 +609,9 @@ extern "C" {
     pub fn getrandom(buf: *mut c_void, buflen: usize, flags: u32) -> isize;
     pub fn arc4random() -> u32;
     pub fn arc4random_buf(bytes: *mut c_void, nbytes: usize);
+    pub fn eventfd(count: u32, flags: i32) -> i32;
+    pub fn eventfd_read(fd: i32, value: *mut eventfd_t) -> i32;
+    pub fn eventfd_write(fd: i32, value: eventfd_t) -> i32;
+    pub fn accept4(s: c_int, addr: *mut sockaddr, addrlen: *mut socklen_t, flags: c_int) -> c_int;
+    pub fn pipe2(pipefd: *mut c_int, flags: c_int) -> c_int;
 }
